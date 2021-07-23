@@ -34,17 +34,10 @@ def pad(text, max_len):
 def preprocess(text):
   return text.strip().casefold().split()
 
-def labelToTensor(label):
-  if (label == 'pos'):
-    val = 1
-  else:
-    val = 0
-  return torch.FloatTensor([val, 1-val])
-
-
 def thresholding(prediction):
   confidence, pred_label = torch.max(prediction, 1)
   return pred_label
+  # return prediction
 
 def timeSince(since):
     now = time.time()

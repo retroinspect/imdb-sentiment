@@ -1,6 +1,9 @@
 import torch.nn as nn
 import torch
 
+# TODO GloVe도 설정에 따라 이용할 수 있게 하려면 어떻게 해야할까?
+# TODO Bidirectional RNN
+
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, vocab_size, useGPU):
         super(RNN, self).__init__()
@@ -14,7 +17,6 @@ class RNN(nn.Module):
         self.hidden_size = hidden_size
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
         self.i2o = nn.Linear(input_size + hidden_size, output_size)
-        self.softmax = nn.Softmax(dim=1)
         self.useGPU = useGPU
 
         # dimension 맞추기
@@ -37,7 +39,6 @@ class RNN(nn.Module):
       combined = torch.cat([input, hidden], dim=1) # combined.shape : batch_size, (input_size + hidden_size)
       hidden = self.i2h(combined)
       output = self.i2o(combined)
-      output = self.softmax(output)
 
       # update_bound 미만의 index에 대해서만 hidden update
       # 이상의 index에 대해서는 old_hidden 사용

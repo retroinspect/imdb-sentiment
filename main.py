@@ -185,7 +185,7 @@ def validate(model, valid_loader, useGPU=True, criterion=nn.BCEWithLogitsLoss())
   return loss, accuracy
 
 
-# TODO 1회 training 하는데 5분 넘게 걸림
+# TODO 1회 training 하는데 3분 넘게 걸림 (batch_size=128)
 for iter in range(n_iters):
   start = time.time()
   
@@ -205,3 +205,5 @@ for iter in range(n_iters):
   Elapsed Time: {elapsed}")
 
 torch.save(model, 'imdb-rnn-classification.pt')
+
+# TODO test 함수 만들기

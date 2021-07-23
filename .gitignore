@@ -1,4 +1,6 @@
 __pycache__/
-.data/
+.data
+data
 *.pth
 *.csv
+*.pt
