@@ -15,6 +15,9 @@ from utils import *
 import dill
 from model import RNN
 
+# load pretrained word vector
+# from torchtext.vocab import GloVe
+
 # 랜덤 시드 고정
 # SEED = 5
 # random.seed(SEED)
@@ -55,10 +58,10 @@ print(f'vocab size: {vocab_size}')
 # TODO refactoring: dataset 만들기 -> vocab 만들기 -> loader 만들기 순서여야해서 리팩토링이 어려움
 # 어떻게 하면 dependency 없앨 수 있을까
 
-def textToTensor(text):
-  return torch.stack([tokenToTensor(token) for token in text]).unsqueeze(1)
+def textToLong(text):
+  return torch.stack([tokenToLong(token) for token in text]).unsqueeze(1)
 
-def tokenToTensor(token):
+def tokenToLong(token):
   if not token in vocabulary:
     item = 0 # <unk>
   else:
@@ -77,7 +80,7 @@ def collate_fn(batch):
   text_lengths = torch.LongTensor([len(text) for text in texts])
   max_len = max(text_lengths)
 
-  texts = torch.cat([textToTensor(pad(text, max_len)) for text in texts], dim=1)
+  texts = torch.cat([textToLong(pad(text, max_len)) for text in texts], dim=1)
   labels = torch.tensor([label == 'positive' for label in labels], dtype=float)
 
   # texts.shape : max_len * batch_size * embedding_size
@@ -101,7 +104,10 @@ valid_loader = DataLoader(valid_set, batch_size=batch_size, collate_fn=collate_f
 n_classes = 2 # pos, neg
 n_hidden = 128
 
-model = RNN(embedding_size, n_hidden, n_classes, vocab_size, useGPU)
+# TODO map GloVe into nn.Embedding
+pretrained_embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embedding_size)
+
+model = RNN(embedding_size, n_hidden, n_classes, vocab_size)
 
 if useGPU:
   model.to(device)
@@ -133,10 +139,7 @@ def train(model, optimizer, train_loader, useGPU=True, criterion=nn.BCEWithLogit
       update_bounds = update_bounds.cuda()
       hidden = hidden.cuda()
 
-    # feed into model word by word
-    for i in range(text_tensor.size(0)):
-      # text_tensor[i].shape: batch_size * embedding_size
-      pred, hidden = model(text_tensor[i], hidden, update_bounds[i])
+    pred, hidden = model(text_tensor, hidden, update_bounds)
       
     optimizer.zero_grad()
     model.zero_grad()

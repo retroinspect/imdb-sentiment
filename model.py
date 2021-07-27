@@ -5,36 +5,37 @@ import torch
 # TODO Bidirectional RNN
 
 class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, vocab_size, useGPU):
+    def __init__(self, input_size, hidden_size, output_size, vocab_size, pretrained_embedding=None):
         super(RNN, self).__init__()
         # embedding dictionary 인자로 넣고 opimize
 
-        # init embeddings with random tensor
-        self.embedding_size = input_size
-        self.embeddings = torch.zeros(vocab_size, input_size)
-        for idx in range(1, self.embeddings.size(0)):
-          self.embeddings[idx] = torch.rand(self.embedding_size)
+        if (pretrained_embedding is not None):
+          self.embedding_layer = pretrained_embedding
+          self.pretrained = True
+        else:
+          # init embeddings with random tensor
+          self.embedding_layer = nn.Embedding(num_embeddings=vocab_size, embedding_dim=input_size, padding_idx=1)
+          self.pretrained = False
+
         self.hidden_size = hidden_size
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
         self.i2o = nn.Linear(input_size + hidden_size, output_size)
-        self.useGPU = useGPU
 
-        # dimension 맞추기
-    def forward(self, idx, hidden, update_bound=None):
-      # TODO batch에 대해 embedding 어떻게 조회???
-      # def getEmbedding(idx):
-      #   if (idx > 0): # 에러 발생
-         #     return self.embeddings[idx]
-          # expand vocab
-        # new_embedding = torch.rand(self.embedding_size).unsqueeze(0)
-        # self.embeddings = torch.cat([self.embedding, new_embedding])
-        # new_vocab_size = self.embeddings.size(0)
-        # return self.embeddings[new_vocab_size-1]
 
-      input = self.embeddings[idx].squeeze(1)
-      if self.useGPU:
-        input = input.cuda()
-      
+    # TODO implement GRU
+    # def gru_init(self, sample_batched_size):
+
+
+    # def gru_step(self, idx, reset, update, hidden, prev_output):
+
+
+
+    def forward_step(self, idx, hidden, update_bound=None):
+      # TODO idx=0(모르는 단어) 처리 시 embedding_layer에 해당 단어에 대한 임베딩 추가
+
+      input = self.embedding_layer(idx)
+      input = input.squeeze(1)
+            
       old_hidden = hidden
       combined = torch.cat([input, hidden], dim=1) # combined.shape : batch_size, (input_size + hidden_size)
       hidden = self.i2h(combined)
@@ -48,6 +49,12 @@ class RNN(nn.Module):
 
       return output, hidden
 
+    def forward(self, text_tensor, hidden, update_bounds):
+    # feed into model word by word
+      for i in range(text_tensor.size(0)):
+        output, hidden = self.forward_step(text_tensor[i], hidden, update_bounds[i])
+      return output, hidden
+
+
     def initHidden(self, sample_batched_size):
       return torch.zeros(sample_batched_size, self.hidden_size)      
-
