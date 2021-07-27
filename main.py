@@ -13,7 +13,7 @@ import string
 import random
 from utils import *
 import dill
-from model import RNN
+from model import RNN, GRU
 
 # load pretrained word vector
 # from torchtext.vocab import GloVe
@@ -30,7 +30,7 @@ device = torch.device("cuda" if useGPU else "cpu")
 
 # hyperparameters
 batch_size=128
-learning_rate=0.001
+learning_rate=0.005
 n_iters=10
 embedding_size=200
 
@@ -81,7 +81,7 @@ def collate_fn(batch):
   max_len = max(text_lengths)
 
   texts = torch.cat([textToLong(pad(text, max_len)) for text in texts], dim=1)
-  labels = torch.tensor([label == 'positive' for label in labels], dtype=float)
+  labels = torch.LongTensor([label == 'positive' for label in labels])
 
   # texts.shape : max_len * batch_size * embedding_size
   # labels.shape : batch_size
@@ -107,13 +107,16 @@ n_hidden = 128
 # TODO map GloVe into nn.Embedding
 pretrained_embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embedding_size)
 
-model = RNN(embedding_size, n_hidden, n_classes, vocab_size)
+# model = RNN(embedding_size, n_hidden, n_classes, vocab_size)
+model = GRU(embedding_size, n_hidden, n_classes, vocab_size)
 
 if useGPU:
   model.to(device)
 
 # nn.BCEWithLogitsLoss includes softmax
-criterion = nn.BCEWithLogitsLoss()
+# criterion = nn.BCEWithLogitsLoss()
+# nn.BCEWithLogitsLoss vs F.cross_entropy
+
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -124,67 +127,73 @@ valid_loss_iter = np.zeros(n_iters, dtype=float)
 train_accuracy_iter = np.zeros(n_iters, dtype=float)  # Temporary numpy array to save accuracy for each epoch
 valid_accuracy_iter = np.zeros(n_iters, dtype=float)
 
-def train(model, optimizer, train_loader, useGPU=True, criterion=nn.BCEWithLogitsLoss()):
+
+def train(model, optimizer, train_loader, useGPU=True):
   model.train()
   total_loss, total_cnt, correct_cnt = 0.0, 0.0, 0.0
 
   # for each mini-batch
+  n_known , n_word= 0.0, 0.0
   for batch_idx, sample_batched in enumerate(train_loader):
     label_tensor, text_tensor, update_bounds = sample_batched
-    hidden = model.initHidden(text_tensor.size(1))
 
     if useGPU:
       label_tensor = label_tensor.cuda()
       text_tensor = text_tensor.cuda()
       update_bounds = update_bounds.cuda()
-      hidden = hidden.cuda()
 
-    pred, hidden = model(text_tensor, hidden, update_bounds)
-      
+    n_word += torch.numel(text_tensor)
+    n_known += torch.count_nonzero(text_tensor).item()
+
+    pred = model(text_tensor, update_bounds)
     optimizer.zero_grad()
-    model.zero_grad()
     # print(pred.shape) # batch_size * n_classes
 
-    target = torch.transpose(torch.stack([label_tensor, 1-label_tensor]), 1, 0)
-    loss = criterion(pred, target)
+    loss = F.cross_entropy(pred, label_tensor)
     loss.backward()
     optimizer.step()
 
     total_loss += loss.item() # accumulate loss
     total_cnt += label_tensor.size(0) # accumulate the number of data
+
     correct_cnt += (label_tensor == thresholding(pred)).sum().item() # number of correct
+
 
   accuracy = correct_cnt * 1.0 / total_cnt  # calculate accuracy  (#accumulated-correct-prediction/#accumulated-data)
   loss = total_loss / total_cnt # calculate and save loss (#accumulated-loss/#accumulated-data)
+  known_rate = n_known * 1.0 / n_word
 
+  # print(f"{known_rate} of words are known")
   return loss, accuracy
 
-def validate(model, valid_loader, useGPU=True, criterion=nn.BCEWithLogitsLoss()):
+def validate(model, valid_loader, useGPU=True):
   model.eval()
   total_loss, total_cnt, correct_cnt = 0.0, 0.0, 0.0
 
+  n_known , n_word= 0.0, 0.0
   for batch_idx, sample_batched in enumerate(valid_loader):
     with torch.no_grad():
       label_tensor, text_tensor, update_bounds = sample_batched
-      hidden = model.initHidden(text_tensor.size(1))
       if useGPU:
         label_tensor = label_tensor.cuda()
         text_tensor = text_tensor.cuda()
         update_bounds = update_bounds.cuda()
-        hidden = hidden.cuda()
 
-      for i in range(text_tensor.size(0)):
-        pred, hidden = model(text_tensor[i], hidden, update_bounds[i])
-        # pred, hidden = model(text_tensor[i], hidden, None) # 비교용
+    n_word += torch.numel(text_tensor)
+    n_known += torch.count_nonzero(text_tensor).item()
 
-    target = torch.transpose(torch.stack([label_tensor, 1-label_tensor]), 1, 0)
-    loss = criterion(pred, target)
+    pred = model(text_tensor, update_bounds)
+
+    loss = F.cross_entropy(pred, label_tensor)
+
     total_loss += loss.item() # accumulate loss
     total_cnt += label_tensor.size(0) # accumulate the number of data
     correct_cnt += (label_tensor == thresholding(pred)).sum().item() # number of correct
   
   accuracy = correct_cnt * 1.0 / total_cnt  # calculate accuracy  (#accumulated-correct-prediction/#accumulated-data)
   loss = total_loss / total_cnt # calculate and save loss (#accumulated-loss/#accumulated-data)
+  known_rate = n_known * 1.0 / n_word
+  # print(f"{known_rate} of words are known")
   return loss, accuracy
 
 

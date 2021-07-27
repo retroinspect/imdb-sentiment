@@ -35,7 +35,7 @@ def preprocess(text):
   return text.strip().casefold().split()
 
 def thresholding(prediction):
-  confidence, pred_label = torch.max(prediction, 1)
+  confidence, pred_label = torch.max(prediction, dim=1)
   return pred_label
   # return prediction
 
