@@ -1,88 +1,57 @@
+"""
+miscellaneous methods
+"""
+
 import torch
-import time
-import math
-from torch.utils.data import Dataset, DataLoader, random_split
-from torchtext import data, datasets
 from torchtext.data import get_tokenizer
-import os
-import csv
+from tqdm import tqdm
+import numpy as np
+import re
 
 unk_token = '<unk>'
 pad_token = '<pad>'
 
-tokenizer = get_tokenizer("basic_english")
+class MyTokenizer(object):
+  def _preprocess_string(self, s):
+    s = re.sub('[=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]', '', s) # remove special characters
+    s = re.sub(r"\s+", ' ', s) # replace multiple spaces into single space
+    s = re.sub(r"\d", '', s) # remove digit
+    return s
 
-def yield_tokens(text):
-  # TODO preprocess
-  # consider <br> </br>, special characters as space
-  return tokenizer(text)
+  def __init__(self, final_tokenizer="basic_english"):
+    self.final_tokenizer = get_tokenizer(final_tokenizer)
 
-def build_vocab(train):
-  voca_set = set()
-  for _, (_, text) in enumerate(train):
-    # print(text)
-    tokens = set(yield_tokens(text))
-    voca_set = voca_set.union(tokens)
-  voca_list = [unk_token, pad_token] + list(voca_set)
-  vocabulary = {k: v for v, k in enumerate(voca_list)}
-  torch.save(vocabulary, 'vocab.pth')
+  def __call__(self, string):
+    preprocessed = self._preprocess_string(string)
+    return self.final_tokenizer(preprocessed)
+
+
+def build_vocab(train, min_freq=5):
+  words = []
+  tokenizer = MyTokenizer()
+
+  for _, sample in enumerate(tqdm(train, desc=f"tokenizing train set")):
+    text = sample['text']
+    words += tokenizer(text)
+
+  print("counting words frequency")
+  words = np.array(words, dtype=np.unicode_)
+  unique, counts = np.unique(words, return_counts=True)
+  vocabulary = dict({unk_token: 0, pad_token: 1})
+  id = 2
+  print(f"sieving words appeared at least {min_freq} times")
+  for freq, word in zip(counts, unique): 
+    if (freq < min_freq):
+      continue
+    vocabulary[word] = id
+    id += 1
+
+  return vocabulary
 
 def pad(text, max_len):
   text += [pad_token] * (max_len - len(text))
   return text
 
-def preprocess(text):
-  return text.strip().casefold().split()
-
 def thresholding(prediction):
   confidence, pred_label = torch.max(prediction, dim=1)
   return pred_label
-  # return prediction
-
-def timeSince(since):
-    now = time.time()
-    s = now - since
-    m = math.floor(s / 60)
-    s -= m * 60
-    return '%dm %ds' % (m, s)
-
-def split_data(dataset, train=0.4, val=0.1, test=0.5):
-  total = len(dataset)
-  n_train_data = int(total * train)
-  n_val_data = int(total * val)
-  n_test_data = total - n_train_data - n_val_data
-  splited = random_split(dataset, [n_train_data, n_val_data, n_test_data])
-  return splited
-
-# TODO 만약 엄청나게 많은 데이터를 로드해야해서 메모리가 부족한 경우에는 어떻게 dataset을 짜야할까?
-
-class IMDBDataset(Dataset):
-  def __init__(self, datapath="IMDB Dataset.csv", transform=None):
-    self.datapath = datapath
-    self.transform = transform
-    self.data = []
-
-    with open(datapath) as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        line_count = 0
-        for row in csv_reader:
-            if line_count == 0:
-                line_count += 1
-            else:
-              self.data.append({'text': row[0], 'label': row[1]})
-              line_count += 1
-
-  def __len__(self):
-    return len(self.data)
-  
-  def __getitem__(self, idx):
-    if torch.is_tensor(idx):
-      idx = idx.tolist()
-    
-    sample = self.data[idx]
-    
-    if self.transform:
-      sample = self.transform(sample)
-    
-    return sample
-
