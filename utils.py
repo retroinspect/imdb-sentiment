@@ -46,6 +46,7 @@ def build_vocab(train, min_freq=5):
     vocabulary[word] = id
     id += 1
 
+  torch.save(vocabulary, 'vocab.pth')
   return vocabulary
 
 def pad(text, max_len):
