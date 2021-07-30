@@ -61,7 +61,7 @@ class GRU(nn.Module):
           self.embedding_layer = pretrained_embedding
         else:
           # init embeddings with random tensor
-          self.embedding_layer = nn.Embedding(num_embeddings=vocab_size, embedding_dim=input_size, padding_idx=1)
+          self.embedding_layer = nn.Embedding(num_embeddings=vocab_size, embedding_dim=input_size, padding_idx=0)
 
         self.hidden_size = hidden_size
         self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size)

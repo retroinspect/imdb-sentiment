@@ -4,11 +4,9 @@ methods & classes on dataset, batching
 """
 
 import pandas as pd
-import csv
 import torch
 from torch.utils.data import Dataset, random_split
-
-from utils import pad, MyTokenizer
+from utils import pad, preprocess_text, tokenize_text
 
 def split_data(dataset, train=0.4, val=0.1, test=0.5):
   total = len(dataset)
@@ -57,13 +55,14 @@ class MyCollator(object):
 
   def __init__(self, vocabulary):
     self.vocabulary = vocabulary
-    self.tokenizer = MyTokenizer()
     
   def __call__(self, batch): # batch example: {label: 'positive', text: 'good movie'}
     labels, texts = [], []
     for sample in batch:
-      label, txt = sample['label'], sample['text']
-      texts.append(self.tokenizer(txt))
+      label, text = sample['label'], sample['text']
+      preprocessed = preprocess_text(text)
+      tokenized = tokenize_text(preprocessed)
+      texts.append(tokenized)
       labels.append(label)
     
     text_lengths = torch.LongTensor([len(text) for text in texts])

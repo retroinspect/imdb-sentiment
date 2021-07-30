@@ -8,37 +8,31 @@ from tqdm import tqdm
 import numpy as np
 import re
 
-unk_token = '<unk>'
 pad_token = '<pad>'
 
-class MyTokenizer(object):
-  def _preprocess_string(self, s):
-    s = re.sub('[=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]', '', s) # remove special characters
-    s = re.sub(r"\s+", ' ', s) # replace multiple spaces into single space
-    s = re.sub(r"\d", '', s) # remove digit
-    return s
+def preprocess_text(word):
+  word = re.sub(r"[^\w\s]", '', word)
+  word = re.sub(r"\s+", ' ', word) # replace multiple spaces into single space
+  word = re.sub(r"\d", '', word)  # remove digit
+  return word
 
-  def __init__(self, final_tokenizer="basic_english"):
-    self.final_tokenizer = get_tokenizer(final_tokenizer)
-
-  def __call__(self, string):
-    preprocessed = self._preprocess_string(string)
-    return self.final_tokenizer(preprocessed)
-
+def tokenize_text(text):
+  tokenized = get_tokenizer("basic_english")(text)
+  return tokenized
 
 def build_vocab(train, min_freq=5):
   words = []
-  tokenizer = MyTokenizer()
 
   for _, sample in enumerate(tqdm(train, desc=f"tokenizing train set")):
     text = sample['text']
-    words += tokenizer(text)
+    preprocessed = preprocess_text(text)
+    words += tokenize_text(preprocessed)
 
   print("counting words frequency")
   words = np.array(words, dtype=np.unicode_)
   unique, counts = np.unique(words, return_counts=True)
-  vocabulary = dict({unk_token: 0, pad_token: 1})
-  id = 2
+  vocabulary = dict({pad_token: 0})
+  id = 1
   print(f"sieving words appeared at least {min_freq} times")
   for freq, word in zip(counts, unique): 
     if (freq < min_freq):
@@ -49,7 +43,9 @@ def build_vocab(train, min_freq=5):
   return vocabulary
 
 def pad(text, max_len):
-  text += [pad_token] * (max_len - len(text))
+  pads = [pad_token] * (max_len - len(text))
+  text = pads + text # 이렇게 바꾸면 갑자기 잘 됨
+  # text = text + pads # 전혀 학습 안함
   return text
 
 def thresholding(prediction):

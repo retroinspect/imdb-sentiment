@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from numpy import Inf
 
 from utils import build_vocab
 from load_data import IMDBDataset, split_data, MyCollator
@@ -43,6 +44,7 @@ print(f'vocab size: {vocab_size}')
 collate_fn = MyCollator(vocabulary)
 train_loader = DataLoader(train_set, batch_size=batch_size, collate_fn=collate_fn, shuffle=True)
 valid_loader = DataLoader(valid_set, batch_size=batch_size, collate_fn=collate_fn, shuffle=True)
+test_loader = DataLoader(test_set, batch_size=batch_size, collate_fn=collate_fn, shuffle=True)
 
 """
 model configuration
@@ -58,15 +60,23 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 """
 train & validate
 """
+valid_loss_min = Inf
 for iter in range(n_iters):
   train_loss, train_accuracy = train(model, optimizer, train_loader)
-  valid_loss, valid_accuracy, valid_known_rate = validate(model, valid_loader)
+  valid_loss, valid_accuracy = validate(model, valid_loader)
 
   print(f"[{iter+1}/{n_iters}] Train Loss : {train_loss:.4f} Train Acc : {train_accuracy:.2f} \
-  Valid Loss : {valid_loss:.4f} Valid Acc : {valid_accuracy:.2f} Valid Word in vocabulary : {valid_known_rate:.2f}")
-
-torch.save(model, 'imdb-rnn-classification.pt')
+  Valid Loss : {valid_loss:.4f} Valid Acc : {valid_accuracy:.2f}")
+  if (valid_loss < valid_loss_min):
+    torch.save(model.state_dict(), 'best-model-state.pt')
+    valid_loss_min = valid_loss
 
 """
-TODO test
+test
 """
+model = GRU(embedding_size, n_hidden, n_classes, vocab_size)
+if useGPU:
+  model.to(device)
+model.load_state_dict(torch.load('./best-model-state.pt'))
+test_loss, test_accuracy = validate(model, test_loader, useGPU, desc="testing...")
+print(f"Test Loss : {test_loss:.4f} Train Acc : {test_accuracy:.2f}")
