@@ -44,8 +44,8 @@ def build_vocab(train, min_freq=5):
 
 def pad(text, max_len):
   pads = [pad_token] * (max_len - len(text))
-  text = pads + text # 이렇게 바꾸면 갑자기 잘 됨
-  # text = text + pads # 전혀 학습 안함
+  # text = pads + text # Built-in GRU, LSTM
+  text = text + pads # My RNN
   return text
 
 def thresholding(prediction):

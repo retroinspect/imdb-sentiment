@@ -38,7 +38,12 @@ print(f'test set size: {len(test_set)}')
 """ 
 build vocabulary & dataloader
 """
-vocabulary = build_vocab(train_set)
+try:
+  vocabulary = torch.load('vocab.pth')
+except:
+  vocabulary = build_vocab(train_set)
+  torch.save(vocabulary, 'vocab.pth')
+
 vocab_size = len(vocabulary)
 print(f'vocab size: {vocab_size}')
 collate_fn = MyCollator(vocabulary)
@@ -52,7 +57,7 @@ model configuration
 - model: RNN, GRU
 - optimizer: SGD, Adam, etc
 """
-model = GRU(embedding_size, n_hidden, n_classes, vocab_size)
+model = RNN(embedding_size, n_hidden, n_classes, vocab_size)
 if useGPU:
   model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)

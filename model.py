@@ -19,6 +19,9 @@ class RNN(nn.Module):
 
   """
   forward_step: update hidden layer only if idx < update_bound
+  idx = batch_size * 1
+  hidden = batch_size * hidden_size
+  input = batch_size * embedding_size
   """
   def forward_step(self, idx, hidden, update_bound=None):
     input = self.embedding_layer(idx)
@@ -33,8 +36,10 @@ class RNN(nn.Module):
 
   """
   forward: feed text_tensor into model word by word
+  text_tensor: seq_length * batch_size
+  update_bounds: seq_length
   """
-  def forward(self, text_tensor, update_bounds):
+  def forward(self, text_tensor, update_bounds=None):
     hidden = self._init_hidden(batch_size=text_tensor.size(1))
     for i in range(text_tensor.size(0)):
       output, hidden = self.forward_step(text_tensor[i], hidden, update_bounds[i])
@@ -64,7 +69,7 @@ class GRU(nn.Module):
           self.embedding_layer = nn.Embedding(num_embeddings=vocab_size, embedding_dim=input_size, padding_idx=0)
 
         self.hidden_size = hidden_size
-        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size)
+        self.gru = MyGRUCell(input_size=input_size, hidden_size=hidden_size, useGPU=useGPU)
         self.dropout = nn.Dropout(dropout_p)
         self.out = nn.Linear(hidden_size, n_classes)
         self.useGPU = useGPU
@@ -87,11 +92,12 @@ TODO debug
 TODO implement biderectional GRU
 """
 class MyGRUCell(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, useGPU=True):
       super(MyGRUCell, self).__init__()
 
       self.input_size = input_size
       self.hidden_size = hidden_size
+      self.useGPU = useGPU
 
       self.reset_weight_input = nn.Linear(input_size, hidden_size)
       self.reset_weight_hidden = nn.Linear(hidden_size, hidden_size)
